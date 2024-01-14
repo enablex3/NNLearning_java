@@ -121,7 +121,7 @@ public class Main {
                 "iris.csv");
         File resultFile = new File(System.getProperty("user.dir") +
                 File.separator +
-                "datasets" +
+                "outputs" +
                 File.separator +
                 "iris_normalized.csv");
 
