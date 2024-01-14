@@ -1,7 +1,12 @@
 package com.learning;
 
+import java.io.File;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.encog.app.analyst.AnalystFileFormat;
+import org.encog.app.analyst.EncogAnalyst;
+import org.encog.app.analyst.csv.normalize.AnalystNormalizeCSV;
+import org.encog.app.analyst.wizard.AnalystWizard;
 import org.encog.engine.network.activation.ActivationSigmoid;
 import org.encog.ml.data.MLData;
 import org.encog.ml.data.MLDataPair;
@@ -14,16 +19,19 @@ import org.encog.neural.networks.training.propagation.resilient.ResilientPropaga
 import org.encog.util.arrayutil.NormalizationAction;
 import org.encog.util.arrayutil.NormalizeArray;
 import org.encog.util.arrayutil.NormalizedField;
+import org.encog.util.csv.CSVFormat;
 
 public class Main {
 
     public static void main(String[] args) {
         //runXORExample();
         //runLunarNormalExample();
-        runMemArrayNormalExample();
+        //runMemArrayNormalExample();
+        runFileNormalExample();
     }
 
     private static void runXORExample() {
+        System.out.println("Running " + Main.class.getSimpleName() + ".runXORExample()");
         // First example (page 12) - XOR NN
         BasicNetwork network = new BasicNetwork();
         network.addLayer(new BasicLayer(null, true, 2));
@@ -68,7 +76,7 @@ public class Main {
         // Create normalized field for fuel stats
         // Acceptable range (0-200)
         // Normalization range (-0.9-0.9)
-        System.out.println("Fuel Stat Normalization");
+        System.out.println("Running " + Main.class.getSimpleName() + ".runLunarNormalExample()");
         NormalizedField fuelStats = new NormalizedField(
             NormalizationAction.Normalize,
             "fuel",
@@ -85,6 +93,7 @@ public class Main {
     }
 
     private static void runMemArrayNormalExample() {
+        System.out.println("Running " + Main.class.getSimpleName() + ".runMemArrayNormalExample()");
         // Generate array of random values
         double[] randDoubles = new double[20];
         for (int i = 0; i < randDoubles.length; i++) {
@@ -100,5 +109,33 @@ public class Main {
         for (int i = 0; i < normalizedRandomData.length; i++) {
             System.out.println(randDoubles[i] + " -> " + normalizedRandomData[i]);
         }
+    }
+    
+    private static void runFileNormalExample() {
+        // The file we need to normalize
+        System.out.println("Running " + Main.class.getSimpleName() + ".runFileNormalExample()");
+        File irsFile = new File(System.getProperty("user.dir") + 
+                File.separator + 
+                "datasets" + 
+                File.separator +
+                "iris.csv");
+        File resultFile = new File(System.getProperty("user.dir") +
+                File.separator +
+                "datasets" +
+                File.separator +
+                "iris_normalized.csv");
+
+        EncogAnalyst encogAnalyst = new EncogAnalyst();
+        // The wizard reads the source file and builds normalization stats
+        AnalystWizard analystWizard = new AnalystWizard(encogAnalyst);
+        // Start the wizard
+        analystWizard.wizard(irsFile, true, AnalystFileFormat.DECPNT_COMMA);
+        // Now, create the normalization object
+        final AnalystNormalizeCSV normalizeCSV = new AnalystNormalizeCSV();
+        normalizeCSV.analyze(irsFile, true, CSVFormat.ENGLISH, encogAnalyst);
+        normalizeCSV.setProduceOutputHeaders(true);
+        // Normalize the file and put results in result file
+        normalizeCSV.normalize(resultFile);
+        System.out.println("Results found in " + resultFile.getAbsolutePath());
     }
 }
