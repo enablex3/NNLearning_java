@@ -1,6 +1,8 @@
 package com.learning;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.encog.app.analyst.AnalystFileFormat;
@@ -8,6 +10,7 @@ import org.encog.app.analyst.EncogAnalyst;
 import org.encog.app.analyst.csv.normalize.AnalystNormalizeCSV;
 import org.encog.app.analyst.wizard.AnalystWizard;
 import org.encog.engine.network.activation.ActivationSigmoid;
+import org.encog.mathutil.libsvm.svm;
 import org.encog.ml.data.MLData;
 import org.encog.ml.data.MLDataPair;
 import org.encog.ml.data.MLDataSet;
@@ -16,18 +19,54 @@ import org.encog.ml.train.MLTrain;
 import org.encog.neural.networks.BasicNetwork;
 import org.encog.neural.networks.layers.BasicLayer;
 import org.encog.neural.networks.training.propagation.resilient.ResilientPropagation;
+import org.encog.persist.EncogDirectoryPersistence;
 import org.encog.util.arrayutil.NormalizationAction;
 import org.encog.util.arrayutil.NormalizeArray;
 import org.encog.util.arrayutil.NormalizedField;
 import org.encog.util.csv.CSVFormat;
 
 public class Main {
+    // Expected for running certain methods
+    private static final String XOREX = "XORExample";
+    private static final String LUNEX = "LunarExample";
+    private static final String MEMEX = "MemArrExample";
+    private static final String FILEX = "FileExample";
 
     public static void main(String[] args) {
-        //runXORExample();
-        //runLunarNormalExample();
-        //runMemArrayNormalExample();
-        runFileNormalExample();
+        String runProp = System.getProperty("run");
+        if (runProp.contains(",")) {
+            // Split it up
+            List<String> methodsToRun = Arrays.asList(runProp.split(","));
+            // Run what's in the list
+            for (String m : methodsToRun) {
+                runMethod(m);
+            }
+        } else if (runProp.trim().equalsIgnoreCase("help")) {
+            runHelp(null );
+        }
+        else {
+            runMethod(runProp);
+        }
+    }
+
+    private static void runMethod(String m) {
+        switch (m) {
+            case XOREX:
+                runXORExample();
+                break;
+            case LUNEX:
+                runLunarNormalExample();
+                break;
+            case MEMEX:
+                runMemArrayNormalExample();
+                break;
+            case FILEX:
+                runFileNormalExample();
+                break;
+            default:
+                runHelp(m);
+                break;
+        }
     }
 
     private static void runXORExample() {
@@ -70,6 +109,14 @@ public class Main {
                 pair.getIdeal().getData(0)
             );
         }
+        System.out.println("Network error: " + network.calculateError(trainingSet));
+        // Example practices persistence
+        String nnFile = System.getProperty("user.dir") + File.separator + "networks" + File.separator + "xorNN.eg";
+        EncogDirectoryPersistence.saveObject(new File(nnFile), network);
+        System.out.println("Network saved to " + nnFile);
+        // Load the network back in a compare (should be the same)
+        BasicNetwork loadedNetwork = (BasicNetwork) EncogDirectoryPersistence.loadObject(new File(nnFile));
+        System.out.println("Loaded network error: " + loadedNetwork.calculateError(trainingSet));
     }
 
     private static void runLunarNormalExample() {
@@ -137,5 +184,13 @@ public class Main {
         // Normalize the file and put results in result file
         normalizeCSV.normalize(resultFile);
         System.out.println("Results found in " + resultFile.getAbsolutePath());
+    }
+
+    private static void runHelp(String m) {
+        if (m != null) {
+            System.out.println("No such method " + m + " exists.");
+        }
+        System.out.println("Progam usage");
+        System.out.println("-Drun: System property with name of example to execute. This could be a single name or a list of names separated by comma (EX: -Drun=XORExample,LunarExample)");
     }
 }
