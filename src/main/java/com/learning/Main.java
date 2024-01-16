@@ -10,14 +10,16 @@ import org.encog.app.analyst.EncogAnalyst;
 import org.encog.app.analyst.csv.normalize.AnalystNormalizeCSV;
 import org.encog.app.analyst.wizard.AnalystWizard;
 import org.encog.engine.network.activation.ActivationSigmoid;
-import org.encog.mathutil.libsvm.svm;
 import org.encog.ml.data.MLData;
 import org.encog.ml.data.MLDataPair;
 import org.encog.ml.data.MLDataSet;
 import org.encog.ml.data.basic.BasicMLDataSet;
-import org.encog.ml.train.MLTrain;
 import org.encog.neural.networks.BasicNetwork;
 import org.encog.neural.networks.layers.BasicLayer;
+import org.encog.neural.networks.training.propagation.Propagation;
+import org.encog.neural.networks.training.propagation.back.Backpropagation;
+import org.encog.neural.networks.training.propagation.manhattan.ManhattanPropagation;
+import org.encog.neural.networks.training.propagation.quick.QuickPropagation;
 import org.encog.neural.networks.training.propagation.resilient.ResilientPropagation;
 import org.encog.persist.EncogDirectoryPersistence;
 import org.encog.util.arrayutil.NormalizationAction;
@@ -31,8 +33,20 @@ public class Main {
     private static final String LUNEX = "LunarExample";
     private static final String MEMEX = "MemArrExample";
     private static final String FILEX = "FileExample";
+    // Propogation types
+    private static final String resilientPropogation = "RESILIENT"; // DEFAULT
+    private static final String backPropogation = "BACK";
+    private static final String manhattanPropogation = "MAN";
+    private static final String quickPropagation = "QPROP";
+
+    private static String propogation = resilientPropogation;
 
     public static void main(String[] args) {
+        // Determine if propogation argument applied
+        String propArg = args[0];
+        if (propArg != null) {
+            propogation = propArg.split("=")[1];
+        }
         String runProp = System.getProperty("run");
         if (runProp.contains(",")) {
             // Split it up
@@ -70,7 +84,7 @@ public class Main {
     }
 
     private static void runXORExample() {
-        System.out.println("Running " + Main.class.getSimpleName() + ".runXORExample()");
+        System.out.println("Running " + Main.class.getSimpleName() + ".runXORExample(PROPOGATION='" + propogation +"')");
         // First example (page 12) - XOR NN
         BasicNetwork network = new BasicNetwork();
         network.addLayer(new BasicLayer(null, true, 2));
@@ -80,13 +94,35 @@ public class Main {
         network.getStructure().finalizeStructure();
         // Randomizes weights in connections between layers
         network.reset();
+
         // Create data for this network
         double[][] xorInput = { {0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}, {1.0, 1.0} };
         double[][] xorOutput = { {0.0}, {1.0}, {1.0}, {0.0} };
         // Create training set
         MLDataSet trainingSet = new BasicMLDataSet(xorInput, xorOutput);
+
         // Create trainer
-        MLTrain trainer = new ResilientPropagation(network, trainingSet);
+        Propagation trainer = null;
+        double learningRate;
+
+        if (propogation.equalsIgnoreCase(resilientPropogation)) {
+            trainer = new ResilientPropagation(network, trainingSet);
+        } else if (propogation.equalsIgnoreCase(backPropogation)) {
+            // Using backpropagation training for this example
+            learningRate = 0.7;
+            double momentum = 0.3;
+            trainer = new Backpropagation(network, trainingSet, learningRate, momentum);
+        } else if (propogation.equalsIgnoreCase(manhattanPropogation)) {
+            learningRate = 0.00001;
+            trainer = new ManhattanPropagation(network, trainingSet, learningRate);
+        } else if (propogation.equalsIgnoreCase(quickPropagation)) {
+            learningRate = 2.0;
+            trainer = new QuickPropagation(network, trainingSet, learningRate);
+        }
+        else {
+            throw new IllegalArgumentException("Unexpected propogation: " + propogation);
+        } 
+        
         // Train the network
         int epoch = 1;
         double errPercentile = 0.01;
@@ -192,5 +228,6 @@ public class Main {
         }
         System.out.println("Progam usage");
         System.out.println("-Drun: System property with name of example to execute. This could be a single name or a list of names separated by comma (EX: -Drun=XORExample,LunarExample)");
+        System.out.println("EXAMPLE: java -jar -Drun=XORExample target/NNLearning-1.0-SNAPSHOT.jar");
     }
 }
