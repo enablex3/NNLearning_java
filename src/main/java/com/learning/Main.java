@@ -16,11 +16,13 @@ import org.encog.ml.data.MLDataSet;
 import org.encog.ml.data.basic.BasicMLDataSet;
 import org.encog.neural.networks.BasicNetwork;
 import org.encog.neural.networks.layers.BasicLayer;
+import org.encog.neural.networks.training.lma.LevenbergMarquardtTraining;
 import org.encog.neural.networks.training.propagation.Propagation;
 import org.encog.neural.networks.training.propagation.back.Backpropagation;
 import org.encog.neural.networks.training.propagation.manhattan.ManhattanPropagation;
 import org.encog.neural.networks.training.propagation.quick.QuickPropagation;
 import org.encog.neural.networks.training.propagation.resilient.ResilientPropagation;
+import org.encog.neural.networks.training.propagation.scg.ScaledConjugateGradient;
 import org.encog.persist.EncogDirectoryPersistence;
 import org.encog.util.arrayutil.NormalizationAction;
 import org.encog.util.arrayutil.NormalizeArray;
@@ -33,19 +35,23 @@ public class Main {
     private static final String LUNEX = "LunarExample";
     private static final String MEMEX = "MemArrExample";
     private static final String FILEX = "FileExample";
-    // Propogation types
+    // Propagation types
     private static final String resilientPropogation = "RESILIENT"; // DEFAULT
     private static final String backPropogation = "BACK";
     private static final String manhattanPropogation = "MAN";
     private static final String quickPropagation = "QPROP";
+    private static final String scgTraining = "SCG";
+    private static final String levenBergTraining = "LMA";
 
-    private static String propogation = resilientPropogation;
+    private static String propagation = resilientPropogation;
 
     public static void main(String[] args) {
-        // Determine if propogation argument applied
+        // Determine if propagation argument applied
         String propArg = args[0];
         if (propArg != null) {
-            propogation = propArg.split("=")[1];
+            if (propArg.contains("p=")) {
+                propagation = propArg.split("=")[1];
+            }
         }
         String runProp = System.getProperty("run");
         if (runProp.contains(",")) {
@@ -84,7 +90,7 @@ public class Main {
     }
 
     private static void runXORExample() {
-        System.out.println("Running " + Main.class.getSimpleName() + ".runXORExample(PROPOGATION='" + propogation +"')");
+        System.out.println("Running " + Main.class.getSimpleName() + ".runXORExample(PROPOGATION='" + propagation +"')");
         // First example (page 12) - XOR NN
         BasicNetwork network = new BasicNetwork();
         network.addLayer(new BasicLayer(null, true, 2));
@@ -103,36 +109,66 @@ public class Main {
 
         // Create trainer
         Propagation trainer = null;
+        // LMA Training is different type
+        LevenbergMarquardtTraining lmaTrainer = null;
         double learningRate;
 
-        if (propogation.equalsIgnoreCase(resilientPropogation)) {
+        // Name of the saved network will vary
+        String nnFile = System.getProperty("user.dir") +
+                File.separator +
+                "networks" +
+                File.separator +
+                "xorNN_<propTrainer>.eg";
+        String subToReplace = "<propTrainer>";
+
+        if (propagation.equalsIgnoreCase(resilientPropogation)) {
             trainer = new ResilientPropagation(network, trainingSet);
-        } else if (propogation.equalsIgnoreCase(backPropogation)) {
+            nnFile = nnFile.replace(subToReplace, resilientPropogation);
+        } else if (propagation.equalsIgnoreCase(backPropogation)) {
             // Using backpropagation training for this example
             learningRate = 0.7;
             double momentum = 0.3;
             trainer = new Backpropagation(network, trainingSet, learningRate, momentum);
-        } else if (propogation.equalsIgnoreCase(manhattanPropogation)) {
+            nnFile = nnFile.replace(subToReplace, backPropogation);
+        } else if (propagation.equalsIgnoreCase(manhattanPropogation)) {
             learningRate = 0.00001;
             trainer = new ManhattanPropagation(network, trainingSet, learningRate);
-        } else if (propogation.equalsIgnoreCase(quickPropagation)) {
+            nnFile = nnFile.replace(subToReplace, manhattanPropogation);
+        } else if (propagation.equalsIgnoreCase(quickPropagation)) {
             learningRate = 2.0;
             trainer = new QuickPropagation(network, trainingSet, learningRate);
+            nnFile = nnFile.replace(subToReplace, quickPropagation);
+        } else if (propagation.equalsIgnoreCase(scgTraining)) {
+            trainer = new ScaledConjugateGradient(network, trainingSet);
+            nnFile = nnFile.replace(subToReplace, scgTraining);
+        } else if (propagation.equalsIgnoreCase(levenBergTraining)) {
+            lmaTrainer = new LevenbergMarquardtTraining(network, trainingSet);
+            nnFile = nnFile.replace(subToReplace, levenBergTraining);
         }
         else {
-            throw new IllegalArgumentException("Unexpected propogation: " + propogation);
+            throw new IllegalArgumentException("Unexpected propogation: " + propagation);
         } 
         
         // Train the network
         int epoch = 1;
         double errPercentile = 0.01;
-        do {
-            trainer.iteration();
-            System.out.println("Epoch #" + epoch + " Error: " + trainer.getError());
-            epoch++;
-        } while (trainer.getError() > errPercentile);
+        if (trainer == null) {
+            // Execute lma trainer
+            do {
+                lmaTrainer.iteration();
+                System.out.println("Epoch #" + epoch + " Error: " + lmaTrainer.getError());
+                epoch++;
+            } while (lmaTrainer.getError() > errPercentile);
+        } else {
+            do {
+                trainer.iteration();
+                System.out.println("Epoch #" + epoch + " Error: " + trainer.getError());
+                epoch++;
+            } while (trainer.getError() > errPercentile);
+        }
+
         // Network is ready for use once it's been trained
-        System.out.println("XOR Neural Network results:");
+        System.out.println("Results of network with " + propagation + " training:");
         for (MLDataPair pair : trainingSet) {
             // Get output of next pair
             final MLData outData = network.compute(pair.getInput());
@@ -147,7 +183,6 @@ public class Main {
         }
         System.out.println("Network error: " + network.calculateError(trainingSet));
         // Example practices persistence
-        String nnFile = System.getProperty("user.dir") + File.separator + "networks" + File.separator + "xorNN.eg";
         EncogDirectoryPersistence.saveObject(new File(nnFile), network);
         System.out.println("Network saved to " + nnFile);
         // Load the network back in a compare (should be the same)
