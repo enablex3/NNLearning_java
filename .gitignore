@@ -2,3 +2,5 @@
 target/
 outputs/*
 networks/*
+*.h5
+*.csv
